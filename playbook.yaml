@@ -13,8 +13,15 @@
         name:
           - python3-venv # needed to create isolated virtual environments
           - python3-pip # needed to install Python packages
+          - nginx
         state: present # install if not already installed
         update_cache: yes # equivalent to `apt-get update` before installing
+
+    - name: Ensure nginx is running and enabled
+      ansible.builtin.service:
+        name: nginx
+        state: started
+        enabled: yes
 
     # ── Task 3: create the deployment directory
     - name: Ensure remote devops directory exists
@@ -30,6 +37,22 @@
       ansible.builtin.copy:
         src: ./requirements.txt # path on the control machine
         dest: /root/devops/requirements.txt # path on the target server
+
+    - name: Ensure bun-sengleang web directory exists
+      ansible.builtin.file:
+        path: /var/www/html/bun-sengleang
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Deploy test HTML page to nginx root
+      ansible.builtin.copy:
+        src: ./bun-sengleang/bun-sengleang.html
+        dest: /var/www/html/bun-sengleang/index.html
+        owner: root
+        group: root
+        mode: "0644"
 
     # ── Task 5: create a Python virtual environment
     - name: Create Python virtual environment
