@@ -1,9 +1,10 @@
-📄 TP3_setup.md
 # TP3 - DevOps Pipeline (Jenkins + Ansible + Laravel + Telegram)
 
 ## Student Information
 - Name: BUN Sengleang
 - Project: TP3 DevOps Deployment
+
+---
 
 ## Objective
 Build a complete CI/CD pipeline using:
@@ -13,20 +14,23 @@ Build a complete CI/CD pipeline using:
 - Laravel
 - Telegram notifications
 
+---
+
 ## Architecture
 
 ```text
 Jenkins (Docker)
-    |
-    v
-Agent (Docker with Ansible)
-    |
-    v
+    ↓
+Agent (Docker + Ansible)
+    ↓
 Remote Server (178.128.93.188)
-    |
-    v
-Laravel Deployment (/var/www/BUN_Sengleang)
+    ↓
+Laravel (/var/www/BUN_Sengleang)
+    ↓
+Nginx (Subfolder Hosting)
 ```
+
+---
 
 ## Docker Setup
 
@@ -55,50 +59,33 @@ services:
 FROM ubuntu:22.04
 
 RUN apt update && apt install -y \
-    openssh-client \
-    curl \
-    git \
-    unzip \
-    python3 \
-    python3-pip \
-    nodejs \
-    npm \
-    php \
-    php-cli \
-    php-mbstring \
-    php-xml \
-    php-bcmath \
-    php-curl \
-    php-mysql
+    openssh-client curl git unzip \
+    python3 python3-pip \
+    nodejs npm \
+    php php-cli php-mbstring php-xml php-bcmath php-curl php-mysql
 
 RUN pip3 install ansible
 
 WORKDIR /workspace
 ```
 
-## SSH Setup (Important)
+---
+
+## SSH Setup
 
 ### Problem
-Ansible failed with:
-
-```text
 Permission denied (publickey,password)
-```
 
 ### Solution
-Generate key:
 ```bash
 ssh-keygen -t ed25519
-```
-
-Copy key to server:
-```bash
 ssh-copy-id root@178.128.93.188
 ```
 
-For Docker agent:
-- Copy key into container, or
-- Mount `.ssh` into the container
+Important:
+Jenkins agent must also have this SSH key.
+
+---
 
 ## Ansible Inventory
 
@@ -106,6 +93,8 @@ For Docker agent:
 [web]
 178.128.93.188 ansible_user=root ansible_ssh_private_key_file=/root/.ssh/id_ed25519
 ```
+
+---
 
 ## Ansible Playbook
 
@@ -149,6 +138,8 @@ For Docker agent:
         chdir: "{{ project_path }}"
 ```
 
+---
+
 ## Jenkins Pipeline
 
 ```groovy
@@ -189,17 +180,22 @@ pipeline {
 }
 ```
 
-## Nginx Configuration
+---
+
+## Nginx Configuration (Subfolder Hosting)
+
+Multiple students share one server, so use a subfolder.
 
 ```nginx
 server {
     listen 80;
-    server_name sengleang.local;
+    server_name _;
 
     root /var/www/BUN_Sengleang/public;
     index index.php index.html;
 
-    location / {
+    location /BUN_Sengleang/ {
+        rewrite ^/BUN_Sengleang/(.*)$ /$1 break;
         try_files $uri $uri/ /index.php?$query_string;
     }
 
@@ -210,58 +206,69 @@ server {
 }
 ```
 
+---
+
+## Important Laravel Fix (Subfolder)
+
+Edit `public/index.php` and add:
+
+```php
+$_SERVER['SCRIPT_NAME'] = '/BUN_Sengleang/index.php';
+$_SERVER['SCRIPT_FILENAME'] = __FILE__;
+```
+
+---
+
 ## Errors Encountered and Solutions
 
 1. SSH Permission Denied
-   - Cause: No SSH key
    - Fix: `ssh-copy-id`
 
 2. Ansible Module Error
    - Error: `No module named 'ansible.module_utils.six.moves'`
-   - Cause: Broken Ansible installation
-   - Fix: `pip3 install ansible`
+   - Fix: reinstall Ansible with `pip3 install ansible`
 
-3. Playbook Not Found
-   - Error: `deploy.yml could not be found`
-   - Cause: Wrong path
-   - Fix: `/workspace/deploy.yml`
+3. Jenkins Agent Offline
+   - Fix: install Java
+   - Command: `apt install openjdk-17-jdk`
 
-4. Jenkins Agent Offline
-   - Cause: Java missing or connection issue
-   - Fix: `apt install openjdk-17-jdk`
+4. Nginx Not Listening
+   - Cause: no active config
+   - Fix: link config to `sites-enabled`
 
-5. Laravel 500 Error (Database)
-   - Error: `attempt to write a readonly database`
-   - Fix: `chmod -R 775 database storage bootstrap/cache`
+5. 404 / 403 Errors
+   - Cause: wrong nginx + permissions
+   - Fix:
+     - `chown -R www-data:www-data /var/www/BUN_Sengleang`
+     - `chmod -R 755 /var/www/BUN_Sengleang`
 
-6. Nginx Conflict
-   - Error: `conflicting server name`
-   - Fix: Use a unique `server_name` or another port
+6. Laravel 404 in Subfolder
+   - Cause: Laravel not aware of base path
+   - Fix: update `public/index.php`
+
+---
 
 ## Telegram Integration
 
 Get chat ID:
+
 ```text
 https://api.telegram.org/bot<TOKEN>/getUpdates
 ```
 
 Send message:
+
 ```bash
 curl -X POST https://api.telegram.org/bot<TOKEN>/sendMessage \
-  -d chat_id=YOUR_CHAT_ID \
-  -d text="Hello from Jenkins"
+-d chat_id=YOUR_CHAT_ID \
+-d text="Hello from Jenkins"
 ```
+
+---
 
 ## Final Result
 
 - Jenkins pipeline working
 - Ansible deployment working
-- Laravel hosted on server
-- Telegram notifications working
-
-## Conclusion
-This project demonstrates a complete DevOps pipeline with:
-- Automated deployment using Ansible
-- CI/CD orchestration using Jenkins
-- Containerized tooling with Docker
-- Real-time status notification via Telegram
+- Laravel hosted at: http://178.128.93.188/BUN_Sengleang/
+- Telegram notification working
