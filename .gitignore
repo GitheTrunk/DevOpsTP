@@ -1,0 +1,40 @@
+# macOS
+.DS_Store
+
+# IDE/editor
+.idea/
+.vscode/
+
+# Logs and temp
+*.log
+*.tmp
+*.swp
+
+# Root runtime artifacts
+agent.jar
+caches/
+remoting/
+workspace/
+
+# Jenkins runtime data (generated files and secrets)
+jenkins_home/
+
+# Laravel app data
+laravel_ansible/.env
+laravel_ansible/.env.*
+!laravel_ansible/.env.example
+laravel_ansible/vendor/
+laravel_ansible/node_modules/
+laravel_ansible/public/build/
+laravel_ansible/public/hot
+laravel_ansible/public/storage
+laravel_ansible/storage/*.key
+laravel_ansible/storage/logs/
+laravel_ansible/storage/framework/cache/
+laravel_ansible/storage/framework/sessions/
+laravel_ansible/storage/framework/testing/
+laravel_ansible/storage/framework/views/
+
+# Laravel caches
+laravel_ansible/.phpunit.result.cache
+laravel_ansible/.phpunit.cache/

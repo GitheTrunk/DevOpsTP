@@ -1,0 +1,61 @@
+- hosts: web
+  become: yes
+
+  vars:
+    project_path: /var/www/BUN_Sengleang
+
+  tasks:
+    - name: Install required packages
+      apt:
+        name:
+          - git
+          - curl
+          - unzip
+          - php
+          - php-cli
+          - php-mbstring
+          - php-xml
+          - php-bcmath
+          - php-curl
+          - php-mysql
+        update_cache: yes
+
+    - name: Install Node.js (NodeSource)
+      shell: |
+        curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+        apt-get install -y nodejs
+
+    - name: Install Composer
+      shell: |
+        curl -sS https://getcomposer.org/installer | php
+        mv composer.phar /usr/local/bin/composer
+      args:
+        creates: /usr/local/bin/composer
+
+    - name: Create Laravel project
+      command: composer create-project laravel/laravel "{{ project_path }}"
+      args:
+        creates: "{{ project_path }}/artisan"
+
+    - name: Set Laravel key
+      command: php artisan key:generate
+      args:
+        chdir: "{{ project_path }}"
+
+    - name: Install npm dependencies
+      command: npm install
+      args:
+        chdir: "{{ project_path }}"
+
+    - name: Build frontend
+      command: npm run build
+      args:
+        chdir: "{{ project_path }}"
+
+    - name: Set permissions
+      file:
+        path: "{{ project_path }}"
+        state: directory
+        recurse: yes
+        owner: www-data
+        group: www-data

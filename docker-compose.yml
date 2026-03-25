@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  jenkins:
+    image: jenkins/jenkins:lts
+    container_name: jenkins-devops
+    privileged: true
+    user: root
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    volumes:
+      - ./jenkins_home:/var/jenkins_home
+    networks:
+      - devops-net
+
+  agent:
+    build: ./laravel-agent
+    container_name: laravel-agent
+    tty: true
+    volumes:
+      - ~/.ssh:/root/.ssh
+      - ./:/workspace
+    networks:
+      - devops-net
+
+networks:
+  devops-net:
