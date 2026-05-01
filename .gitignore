@@ -1,0 +1,34 @@
+# macOS / editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.zed/
+.cursor/
+
+# Logs and local runtime files
+*.log
+*.tmp
+*.pid
+
+# Maven / Java build output
+target/
+*.class
+
+# Local Nexus repository data from docker-compose.yml
+nexus-data/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+auth.json
+*.key
+
+# Node / PHP dependencies and build output
+node_modules/
+vendor/
+dist/
+build/
+coverage/
+
