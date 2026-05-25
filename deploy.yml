@@ -1,0 +1,287 @@
+---
+- name: Deploy Laravel staging and production
+  hosts: laravel
+  become: yes
+
+  vars:
+
+    repo_url: "https://github.com/taltongsreng/i4gic2024.git"
+
+    websites:
+
+      - name: staging
+        path: /var/www/html/staging
+        db_name: staging_db
+        server_name: i4gic2024.staging
+
+      - name: production
+        path: /var/www/html/production
+        db_name: prod_db
+        server_name: i4gic2024.com
+
+  tasks:
+
+  ################################################
+  # INSTALL ENVIRONMENT
+  ################################################
+
+  - name: Update package cache
+    apt:
+      update_cache: yes
+
+  - name: Install packages
+    apt:
+      name:
+
+        - nginx
+        - git
+        - composer
+        - npm
+        - mariadb-server
+
+        - php8.3-fpm
+        - php8.3-mysql
+        - php8.3-xml
+        - php8.3-mbstring
+        - php8.3-curl
+        - php8.3-zip
+
+      state: present
+
+  ################################################
+  # CHECK SERVICES
+  ################################################
+
+  - name: Ensure nginx running
+    service:
+      name: nginx
+      state: started
+      enabled: yes
+
+  - name: Ensure mariadb running
+    service:
+      name: mariadb
+      state: started
+      enabled: yes
+
+  - name: Ensure php-fpm running
+    service:
+      name: php8.3-fpm
+      state: started
+      enabled: yes
+
+  ################################################
+  # CREATE WEBSITE DIRECTORIES
+  ################################################
+
+  - name: Create folders
+    file:
+
+      path: "{{ item.path }}"
+      state: directory
+
+      owner: www-data
+      group: www-data
+
+      mode: '0755'
+
+    loop: "{{ websites }}"
+
+  ################################################
+  # CLONE OR PULL SOURCE
+  ################################################
+
+  - name: Pull latest git
+    git:
+
+      repo: "{{ repo_url }}"
+
+      dest: "{{ item.path }}"
+
+      update: yes
+      force: yes
+
+    loop: "{{ websites }}"
+
+    become_user: www-data
+
+  ################################################
+  # ENV FILES
+  ################################################
+
+  - name: Staging env
+    template:
+
+      src: staging.env.j2
+
+      dest: /var/www/html/staging/.env
+
+      owner: www-data
+      group: www-data
+
+  - name: Production env
+    template:
+
+      src: production.env.j2
+
+      dest: /var/www/html/production/.env
+
+      owner: www-data
+      group: www-data
+
+  ################################################
+  # COMPOSER
+  ################################################
+
+  - name: Composer install
+
+    command:
+
+      cmd: composer install
+
+      chdir: "{{ item.path }}"
+
+    loop: "{{ websites }}"
+
+    become_user: www-data
+
+  ################################################
+  # NODE
+  ################################################
+  - name: Fix npm permissions
+    file:
+      path: /var/www/.npm
+      state: directory
+      owner: www-data
+      group: www-data
+      mode: '0755'
+    
+  - name: NPM install
+
+    command:
+
+      cmd: npm install --cache /var/www/.npm
+
+      chdir: "{{ item.path }}"
+
+    loop: "{{ websites }}"
+
+    become_user: www-data
+
+  - name: Build frontend
+
+    command:
+
+      cmd: npm run build
+
+      chdir: "{{ item.path }}"
+
+    loop: "{{ websites }}"
+
+    become_user: www-data
+
+  ################################################
+  # LARAVEL
+  ################################################
+
+  - name: Generate laravel key
+
+    command:
+
+      cmd: php artisan key:generate --force
+
+      chdir: "{{ item.path }}"
+
+    loop: "{{ websites }}"
+
+    become_user: www-data
+
+  ################################################
+  # NGINX
+  ################################################
+
+  - name: Staging config
+
+    template:
+
+      src: staging-nginx.conf.j2
+
+      dest: /etc/nginx/sites-available/staging
+
+  - name: Production config
+
+    template:
+
+      src: production-nginx.conf.j2
+
+      dest: /etc/nginx/sites-available/production
+
+  - name: Enable staging
+
+    file:
+
+      src: /etc/nginx/sites-available/staging
+
+      dest: /etc/nginx/sites-enabled/staging
+
+      state: link
+
+  - name: Enable production
+
+    file:
+
+      src: /etc/nginx/sites-available/production
+
+      dest: /etc/nginx/sites-enabled/production
+
+      state: link
+
+  - name: Remove default nginx
+
+    file:
+
+      path: /etc/nginx/sites-enabled/default
+
+      state: absent
+
+  - name: Validate nginx
+
+    command: nginx -t
+
+    changed_when: false
+
+  - name: Restart nginx
+
+    service:
+
+      name: nginx
+
+      state: restarted
+
+  ################################################
+  # EMAIL RESULT
+  ################################################
+
+  - name: Send deployment email
+
+    mail:
+
+      host: localhost
+
+      port: 25
+
+      to: bsengleang@example.com
+
+      subject: Laravel Deployment Finished
+
+      body: |
+
+        Deployment successful
+
+        Staging:
+        /var/www/html/staging
+
+        Production:
+        /var/www/html/production
+
+    ignore_errors: yes
